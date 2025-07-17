@@ -84,33 +84,50 @@ private:
     }
 
     int evaluate_position(char player, char opponent) const {
-        std::string board_state = board_to_string();
-        if (evaluation_cache.find(board_state) != evaluation_cache.end()) {
-            return evaluation_cache.at(board_state);
-        }
+    std::string board_state = board_to_string();
+    if (evaluation_cache.find(board_state) != evaluation_cache.end()) {
+        return evaluation_cache.at(board_state);
+    }
 
-        int score = 0;
-        int center = BOARD_SIZE / 2;
-        for (int x = 0; x < BOARD_SIZE; ++x) {
-            for (int y = 0; y < BOARD_SIZE; ++y) {
-                if (board_[x][y] != '.') continue;
-                int center_bonus = 10 - (std::abs(x - center) + std::abs(y - center));
-                int min_distance = BOARD_SIZE;
-                for (int i = 0; i < BOARD_SIZE; ++i) {
-                    for (int j = 0; j < BOARD_SIZE; ++j) {
-                        if (board_[i][j] != '.') {
-                            int dist = std::abs(x - i) + std::abs(y - j);
-                            min_distance = std::min(min_distance, dist);
+    int score = 0;
+    int center = BOARD_SIZE / 2;
+    for (int x = 0; x < BOARD_SIZE; ++x) {
+        for (int y = 0; y < BOARD_SIZE; ++y) {
+            if (board_[x][y] != '.') continue;
+            int center_bonus = 20 - (std::abs(x - center) + std::abs(y - center)) * 2; // ��������� ��� ������
+            int line_bonus = 0;
+            // �������� ���� ����������� ��� ������������� �����
+            for (int dx = -1; dx <= 1; ++dx) {
+                for (int dy = -1; dy <= 1; ++dy) {
+                    if (dx == 0 && dy == 0) continue;
+                    int count = 0;
+                    for (int step = 1; step < WIN_LENGTH; ++step) {
+                        int nx = x + dx * step;
+                        int ny = y + dy * step;
+                        if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE && board_[nx][ny] == player) {
+                            count++;
+                        } else {
+                            break;
                         }
                     }
+                    line_bonus += (count == 2 ? 50 : count == 3 ? 200 : 0); // ����� �� 3 ��� 4 �����
                 }
-                score += center_bonus + (min_distance > 2 ? 5 : 0);
             }
+            int min_distance = BOARD_SIZE;
+            for (int i = 0; i < BOARD_SIZE; ++i) {
+                for (int j = 0; j < BOARD_SIZE; ++j) {
+                    if (board_[i][j] != '.') {
+                        int dist = std::abs(x - i) + std::abs(y - j);
+                        min_distance = std::min(min_distance, dist);
+                    }
+                }
+            }
+            score += center_bonus + line_bonus + (min_distance > 2 ? 10 : 0);
         }
-
-        evaluation_cache[board_state] = score;
-        return score;
     }
+    evaluation_cache[board_state] = score;
+    return score;
+}
 
     bool find_blocking_move(int& best_x, int& best_y, char player, char opponent) {
         for (int x = 0; x < BOARD_SIZE; ++x) {
