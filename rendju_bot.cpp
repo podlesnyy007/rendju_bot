@@ -130,23 +130,65 @@ private:
 }
 
     bool find_blocking_move(int& best_x, int& best_y, char player, char opponent) {
-        for (int x = 0; x < BOARD_SIZE; ++x) {
-            for (int y = 0; y < BOARD_SIZE; ++y) {
-                if (!is_valid_move(x, y)) continue;
-                board_[x][y] = opponent; // ���������� ��� ���������
-                if (check_win(x, y, opponent)) {
-                    board_[x][y] = '.'; // ���������� ����� � �������� ���������
-                    if (is_valid_move(x, y)) { // ��������� ��� ��� �� ������ ������
-                        best_x = x;
-                        best_y = y;
-                        return true;
+    for (int x = 0; x < BOARD_SIZE; ++x) {
+        for (int y = 0; y < BOARD_SIZE; ++y) {
+            if (!is_valid_move(x, y)) continue;
+            board_[x][y] = opponent;
+            bool is_threat = false;
+            // �������� ��������
+            if (check_win(x, y, opponent)) {
+                is_threat = true;
+            } else {
+                // �������� 4 � ��� ��� �������� ���
+                for (int dx = -1; dx <= 1; ++dx) {
+                    for (int dy = -1; dy <= 1; ++dy) {
+                        if (dx == 0 && dy == 0) continue;
+                        int count = 1;
+                        for (int step = 1; step < WIN_LENGTH - 1; ++step) {
+                            int nx = x + dx * step;
+                            int ny = y + dy * step;
+                            if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE && board_[nx][ny] == opponent) {
+                                count++;
+                            } else {
+                                break;
+                            }
+                        }
+                        if (count >= 4) is_threat = true;
+                        // �������� �������� ��� (����������)
+                        if (count == 3) {
+                            for (int ddx = -1; ddx <= 1; ++ddx) {
+                                for (int ddy = -1; ddy <= 1; ++ddy) {
+                                    if ((ddx == 0 && ddy == 0) || (ddx == dx && ddy == dy)) continue;
+                                    int other_count = 0;
+                                    for (int step = 1; step < WIN_LENGTH - 1; ++step) {
+                                        int nx = x + ddx * step;
+                                        int ny = y + ddy * step;
+                                        if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE && board_[nx][ny] == opponent) {
+                                            other_count++;
+                                        } else {
+                                            break;
+                                        }
+                                    }
+                                    if (other_count >= 3) is_threat = true;
+                                }
+                            }
+                        }
                     }
                 }
-                board_[x][y] = '.'; // ���������� ���������
             }
+            if (is_threat) {
+                board_[x][y] = '.';
+                if (is_valid_move(x, y)) {
+                    best_x = x;
+                    best_y = y;
+                    return true;
+                }
+            }
+            board_[x][y] = '.';
         }
-        return false;
     }
+    return false;
+}
 
     int minimax(int depth, int alpha, int beta, bool maximizing, char player, char opponent) {
         if (std::chrono::steady_clock::now() - start_time > MOVE_TIMEOUT || depth < 0) {
@@ -206,65 +248,26 @@ private:
         return false;
     }
 
-    void find_best_move(int opponent_x, int opponent_y, int& best_x, int& best_y, bool is_first_move) {
-        start_time = std::chrono::steady_clock::now();
+void find_best_move(int opponent_x, int opponent_y, int& best_x, int& best_y, bool is_first_move) {
+    start_time = std::chrono::steady_clock::now();
 
-        if (is_first_move && is_black_turn) {
-            if (is_valid_move(15, 15)) {
-                best_x = 15;
-                best_y = 15;
-                return;
-            } else if (find_first_valid_move(best_x, best_y)) {
-                return;
-            }
-        }
-
-        char player = is_black_turn ? 'B' : 'W';
-        char opponent = is_black_turn ? 'W' : 'B';
-
-        // ��������� 1: ��������� ������� ���������
-        if (find_blocking_move(best_x, best_y, player, opponent)) {
-            if (is_valid_move(best_x, best_y)) {
-                return;
-            }
-        }
-
-        // ��������� 2: ���� ���������� ��� ��� ����
-        int best_score = std::numeric_limits<int>::min();
-        best_x = -1;
-        best_y = -1;
-
-        int search_range = 4;
-        int start_x = std::max(0, opponent_x - search_range);
-        int end_x = std::min(BOARD_SIZE - 1, opponent_x + search_range);
-        int start_y = std::max(0, opponent_y - search_range);
-        int end_y = std::min(BOARD_SIZE - 1, opponent_y + search_range);
-
-        std::vector<std::pair<int, int>> best_moves;
-        for (int x = start_x; x <= end_x; ++x) {
-            for (int y = start_y; y <= end_y; ++y) {
-                if (is_valid_move(x, y)) {
-                    best_moves.emplace_back(x, y);
-                }
-            }
-        }
-
-        if (best_moves.empty()) {
-            for (int x = 0; x < BOARD_SIZE; ++x) {
-                for (int y = 0; y < BOARD_SIZE; ++y) {
-                    if (is_valid_move(x, y)) {
-                        best_moves.emplace_back(x, y);
-                    }
-                }
-            }
-        }
-
-        if (best_moves.empty() && find_first_valid_move(best_x, best_y)) {
+    if (is_first_move && is_black_turn) {
+        if (is_valid_move(15, 15)) {
+            best_x = 15;
+            best_y = 15;
+            return;
+        } else if (find_first_valid_move(best_x, best_y)) {
             return;
         }
+    }
 
-        for (const auto& move : best_moves) {
-            int x = move.first, y = move.second;
+    char player = is_black_turn ? 'B' : 'W';
+    char opponent = is_black_turn ? 'W' : 'B';
+
+    // ��������� 1: ���� ���������� ��� ��� ���� (4 � ��� � ������������ 5)
+    for (int x = 0; x < BOARD_SIZE; ++x) {
+        for (int y = 0; y < BOARD_SIZE; ++y) {
+            if (!is_valid_move(x, y)) continue;
             board_[x][y] = player;
             if (check_win(x, y, player)) {
                 board_[x][y] = '.';
@@ -272,25 +275,84 @@ private:
                 best_y = y;
                 return;
             }
-            int score = minimax(MAX_DEPTH - 1, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), false, player, opponent);
             board_[x][y] = '.';
-            if (score > best_score) {
-                best_score = score;
-                best_x = x;
-                best_y = y;
-            }
-            if (std::chrono::steady_clock::now() - start_time > MOVE_TIMEOUT) {
-                break;
-            }
         }
+    }
 
-        if (best_x == -1 || best_y == -1 || !is_valid_move(best_x, best_y)) {
-            if (!find_first_valid_move(best_x, best_y)) {
-                best_x = -1;
-                best_y = -1;
+    // ��������� 2: ��������� ������� ���������
+    if (find_blocking_move(best_x, best_y, player, opponent)) {
+        if (is_valid_move(best_x, best_y)) {
+            return;
+        }
+    }
+
+    // ��������� 3: ���� ���������� ��� ��� ����
+    int best_score = std::numeric_limits<int>::min();
+    best_x = -1;
+    best_y = -1;
+
+    // ������������ ������� ������
+    int occupied_count = 0;
+    for (const auto& row : board_) {
+        occupied_count += std::count(row.begin(), row.end(), '.') == 0 ? 0 : BOARD_SIZE - std::count(row.begin(), row.end(), '.');
+    }
+    int search_range = std::min(8, (BOARD_SIZE - occupied_count / 100) / 2 + 4); // ��������� � ���������
+    int start_x = std::max(0, opponent_x - search_range);
+    int end_x = std::min(BOARD_SIZE - 1, opponent_x + search_range);
+    int start_y = std::max(0, opponent_y - search_range);
+    int end_y = std::min(BOARD_SIZE - 1, opponent_y + search_range);
+
+    std::vector<std::pair<int, int>> best_moves;
+    for (int x = start_x; x <= end_x; ++x) {
+        for (int y = start_y; y <= end_y; ++y) {
+            if (is_valid_move(x, y)) {
+                best_moves.emplace_back(x, y);
             }
         }
     }
+
+    if (best_moves.empty()) {
+        for (int x = 0; x < BOARD_SIZE; ++x) {
+            for (int y = 0; y < BOARD_SIZE; ++y) {
+                if (is_valid_move(x, y)) {
+                    best_moves.emplace_back(x, y);
+                }
+            }
+        }
+    }
+
+    if (best_moves.empty() && find_first_valid_move(best_x, best_y)) {
+        return;
+    }
+
+    for (const auto& move : best_moves) {
+        int x = move.first, y = move.second;
+        board_[x][y] = player;
+        if (check_win(x, y, player)) {
+            board_[x][y] = '.';
+            best_x = x;
+            best_y = y;
+            return;
+        }
+        int score = minimax(MAX_DEPTH - 1, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), false, player, opponent);
+        board_[x][y] = '.';
+        if (score > best_score) {
+            best_score = score;
+            best_x = x;
+            best_y = y;
+        }
+        if (std::chrono::steady_clock::now() - start_time > MOVE_TIMEOUT) {
+            break;
+        }
+    }
+
+    if (best_x == -1 || best_y == -1 || !is_valid_move(best_x, best_y)) {
+        if (!find_first_valid_move(best_x, best_y)) {
+            best_x = -1;
+            best_y = -1;
+        }
+    }
+}
 
 public:
     RenjuBot(boost::asio::io_context& io_context, int port)
